@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <record id="view_link_purchase_wizard_form" model="ir.ui.view">
+        <field name="name">link.purchase.wizard.form</field>
+        <field name="model">link.purchase.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Vincular Órdenes de Compra Existentes">
+                <sheet>
+                    <field name="sale_order_id" invisible="1"/>
+                    <field name="available_count" invisible="1"/>
+                    
+                    <!-- Información de la Venta -->
+                    <group>
+                        <field name="sale_vehicle_info" nolabel="1" widget="html"/>
+                    </group>
+                    
+                    <separator string="🔍 Filtros de Búsqueda"/>
+                    
+                    <!-- Filtros -->
+                    <group>
+                        <group>
+                            <field name="partner_id" 
+                                   placeholder="Seleccione un proveedor..."
+                                   options="{'no_create': True}"/>
+                            <field name="state_filter"/>
+                        </group>
+                        <group>
+                            <label for="date_from" string="Rango de Fechas"/>
+                            <div class="o_row">
+                                <field name="date_from" 
+                                       placeholder="Desde"
+                                       class="oe_inline"/>
+                                <span class="oe_inline"> - </span>
+                                <field name="date_to" 
+                                       placeholder="Hasta"
+                                       class="oe_inline"/>
+                            </div>
+                            <field name="origin_filter" 
+                                   placeholder="Buscar por número o referencia..."/>
+                        </group>
+                    </group>
+                    
+                    <div class="oe_button_box mb-3">
+                        <button name="action_refresh_search" 
+                                type="object" 
+                                class="btn-secondary"
+                                string="🔄 Buscar"
+                                help="Aplicar filtros y buscar compras"/>
+                        <button name="action_select_all" 
+                                type="object" 
+                                class="btn-secondary"
+                                string="☑ Seleccionar Todas"
+                                invisible="available_count == 0"
+                                help="Seleccionar todas las compras encontradas"/>
+                        <button name="action_deselect_all" 
+                                type="object" 
+                                class="btn-secondary"
+                                string="☐ Deseleccionar Todas"
+                                help="Limpiar selección"/>
+                    </div>
+                    
+                    <!-- Resultado: Compras Disponibles -->
+                    <group string="📦 Órdenes de Compra Disponibles">
+                        <field name="available_purchase_ids" nolabel="1" widget="many2many" mode="tree">
+                            <tree decoration-info="state == 'purchase'" 
+                                  decoration-success="state == 'done'"
+                                  decoration-muted="state == 'draft'">
+                                <field name="name" string="Número"/>
+                                <field name="partner_id" string="Proveedor"/>
+                                <field name="date_order" string="Fecha"/>
+                                <field name="amount_total" string="Total" widget="monetary"/>
+                                <field name="currency_id" column_invisible="1"/>
+                                <field name="state" string="Estado" widget="badge"
+                                       decoration-info="state == 'purchase'"
+                                       decoration-success="state == 'done'"
+                                       decoration-warning="state == 'to approve'"
+                                       decoration-muted="state == 'draft'"/>
+                            </tree>
+                        </field>
+                    </group>
+                    
+                    <div class="alert alert-warning" role="alert" 
+                         invisible="available_count &gt; 0">
+                        <p><strong>⚠️ No se encontraron órdenes de compra</strong></p>
+                        <p>No hay compras que coincidan con los filtros seleccionados.</p>
+                        <p><em>Tip: Intente cambiar los filtros o dejar algunos vacíos.</em></p>
+                    </div>
+                    
+                    <separator string="✅ Compras a Vincular" 
+                               invisible="available_count == 0"/>
+                    
+                    <!-- Selección -->
+                    <group invisible="available_count == 0">
+                        <field name="selected_purchase_ids" 
+                               nolabel="1" 
+                               widget="many2many_tags"
+                               options="{'color_field': 'state', 'no_create': True}"/>
+                    </group>
+                    
+                    <!-- Opciones -->
+                    <group string="⚙️ Opciones" invisible="available_count == 0">
+                        <field name="x_copy_vehicle_data"/>
+                    </group>
+                    
+                </sheet>
+                
+                <footer>
+                    <button string="Vincular Compras" 
+                            name="action_link_purchases" 
+                            type="object" 
+                            class="btn-primary"
+                            invisible="available_count == 0"/>
+                    <button string="Cerrar" 
+                            special="cancel" 
+                            class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

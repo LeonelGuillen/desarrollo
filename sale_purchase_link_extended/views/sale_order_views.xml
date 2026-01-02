@@ -8,11 +8,13 @@
         <field name="arch" type="xml">
             
             <xpath expr="//div[@name='button_box']" position="inside">
+                <!-- Botón: Ver Compras Relacionadas -->
                 <button name="action_view_purchase_orders" 
                         type="object" 
                         class="oe_stat_button" 
                         icon="fa-shopping-cart"
-                        invisible="purchase_order_count == 0">
+                        invisible="purchase_order_count == 0"
+                        groups="sales_team.group_sale_salesman,purchase.group_purchase_user">
                     <div class="o_field_widget o_stat_info">
                         <span class="o_stat_value">
                             <field name="purchase_order_count"/>
@@ -21,12 +23,24 @@
                     </div>
                 </button>
                 
+                <!-- 🆕 Botón: Vincular Compra Existente -->
+                <button name="action_link_existing_purchase" 
+                        type="object" 
+                        class="oe_stat_button" 
+                        icon="fa-link"
+                        string="Vincular"
+                        invisible="state not in ['sale', 'done']"
+                        groups="sales_team.group_sale_salesman,purchase.group_purchase_user"
+                        help="Asociar órdenes de compra existentes a esta venta"/>
+                
+                <!-- Botón: Crear Compra Nueva -->
                 <button name="action_create_purchase_orders" 
                         type="object" 
                         class="oe_stat_button" 
                         icon="fa-plus-square"
                         string="Crear Compra"
-                        invisible="state not in ['sale', 'done']"/>
+                        invisible="state not in ['sale', 'done']"
+                        groups="sales_team.group_sale_salesman,purchase.group_purchase_user"/>
             </xpath>
             
             <xpath expr="//field[@name='partner_id']" position="after">
@@ -37,10 +51,17 @@
             </xpath>
             
             <xpath expr="//notebook" position="inside">
-                <page string="Liquidación de Caso" name="x_liquidacion_caso">
+                <page string="💰 Liquidación de Caso" name="x_liquidacion_caso">
+                    
+                    <!-- 🆕 Alerta informativa sobre conversión de moneda -->
+                    <div class="alert alert-info" role="alert">
+                        <p><strong>ℹ️ Conversión Automática de Moneda</strong></p>
+                        <p>Todos los montos se convierten automáticamente a <strong><field name="currency_id" readonly="1" class="oe_inline"/></strong> 
+                           usando el tipo de cambio de la fecha de cada documento.</p>
+                    </div>
                     
                     <group>
-                        <group string="Estadísticas de Compra (Costos)">
+                        <group string="📊 Estadísticas de Compra (Costos)">
                             <field name="purchase_lines_in_process"/>
                             <field name="pending_to_purchase"/>
                             <field name="products_purchased_qty"/>
@@ -48,7 +69,7 @@
                             <field name="total_purchase_amount" widget="monetary" class="oe_subtotal_footer"/>
                         </group>
                         
-                        <group string="Estadísticas de Venta (Ingresos)">
+                        <group string="💵 Estadísticas de Venta (Ingresos)">
                             <field name="total_invoiced_amount" widget="monetary" string="1. Total Facturado (Bruto)"/>
                             
                             <field name="total_credit_note_amount" widget="monetary" 
@@ -60,7 +81,10 @@
                                    class="oe_subtotal_footer"/>
                                    
                             <field name="sale_completion_percentage" widget="percentage"
-                                   string="Porcentaje de Utilidad (Neto)"/>
+                                   string="% de Utilidad (Neto)"
+                                   decoration-success="sale_completion_percentage > 0.2"
+                                   decoration-warning="sale_completion_percentage > 0 and sale_completion_percentage &lt;= 0.2"
+                                   decoration-danger="sale_completion_percentage &lt;= 0"/>
                             
                             <field name="profit_margin" widget="monetary"
                                    string="Margen de Utilidad (Neto)"
@@ -70,11 +94,13 @@
                         </group>
                     </group>
                     
-                    <group string="Órdenes de Compra Relacionadas">
+                    <separator string="🛒 Órdenes de Compra Relacionadas"/>
+                    <group>
                         <field name="purchase_orders_summary" nolabel="1" widget="html"/>
                     </group>
                     
-                    <group string="Control de Productos (Vendidos vs Comprados)">
+                    <separator string="📦 Control de Productos (Vendidos vs Comprados)"/>
+                    <group>
                         <field name="products_control_summary" nolabel="1" widget="html"/>
                     </group>
                     
@@ -82,12 +108,12 @@
                         <button name="action_export_liquidation_excel" 
                                 type="object" 
                                 class="oe_highlight" 
-                                string="Exportar a Excel"
+                                string="📊 Exportar a Excel"
                                 icon="fa-file-excel-o"/>
                         <button name="action_export_liquidation_pdf" 
                                 type="object" 
                                 class="oe_highlight" 
-                                string="Exportar a PDF"
+                                string="📄 Exportar a PDF"
                                 icon="fa-file-pdf-o"/>
                     </div>
                 </page>

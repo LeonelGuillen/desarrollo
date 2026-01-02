@@ -21,9 +21,12 @@
                 </button>
             </xpath>
             
-            <!-- Campo: Orden de Venta Asociada -->
+            <!-- 🆕 Campo EDITABLE: Orden de Venta Asociada -->
             <xpath expr="//field[@name='partner_id']" position="after">
-                <field name="x_sale_order_id" readonly="1"/>
+                <field name="x_sale_order_id" 
+                       options="{'no_create': True, 'no_open': True}"
+                       placeholder="Seleccione una orden de venta para vincular..."
+                       help="Puede seleccionar manualmente una orden de venta existente para vincular esta compra"/>
             </xpath>
             
             <!-- Campos de Vehículo -->
@@ -79,6 +82,9 @@
                 <filter string="Con Venta Asociada" 
                         name="with_sale_order" 
                         domain="[('x_sale_order_id', '!=', False)]"/>
+                <filter string="Sin Venta Asociada" 
+                        name="without_sale_order" 
+                        domain="[('x_sale_order_id', '=', False)]"/>
                 <group expand="0" string="Agrupar Por">
                     <filter string="Orden de Venta" name="group_sale" context="{'group_by': 'x_sale_order_id'}"/>
                     <filter string="Placa" name="group_placa" context="{'group_by': 'x_placa'}"/>

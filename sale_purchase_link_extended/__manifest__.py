@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Sale Purchase Link Extended',
-    'version': '18.0.1.0.0',
+    'version': '18.0.2.0.0',  # 🆕 Versión actualizada
     'category': 'Sales/Purchase',
     'summary': '''
         Vinculación avanzada entre Órdenes de Venta, Compra y Facturas con:
+        - Conversión automática de moneda en liquidación
+        - Vinculación manual de compras existentes
         - Proveedor genérico automático
         - Copia de información de vehículo (Ventas → Compras → Facturas)
         - Fecha límite a 10 días hábiles
@@ -15,6 +17,21 @@
     'description': '''
         Sale Purchase Link Extended
         ============================
+        
+        🆕 **MEJORAS VERSIÓN 2.0:**
+        ---------------------------
+        1. **Conversión Automática de Moneda en Liquidación**
+           - Todos los montos se convierten a la moneda de la venta
+           - Usa el tipo de cambio de la fecha del documento
+           - Muestra montos originales y convertidos
+           - Cálculos correctos para casos multimoneda (USD/CRC/EUR)
+        
+        2. **Vinculación Manual de Compras Existentes**
+           - Nuevo botón "Vincular Compra" en ventas
+           - Campo editable x_sale_order_id en compras
+           - Wizard de búsqueda y vinculación con filtros
+           - Actualización automática de relaciones
+           - Copia opcional de datos de vehículo
         
         Funcionalidades Principales:
         -----------------------------
@@ -46,14 +63,15 @@
            - Cantidades pendientes
            - Vista en líneas de venta
         
-        6. **Liquidación Detallada**
+        6. **Liquidación Detallada con Conversión de Moneda**
            - Resumen HTML de todas las OC relacionadas con montos
+           - Conversión automática a moneda de venta
            - Control visual de productos vendidos vs comprados
            - Estadísticas de compra y venta
-           - Margen de utilidad
+           - Margen de utilidad con cálculos multimoneda
            - Exportación a Excel y PDF
         
-        7. **Integración con Facturas (NUEVO)**
+        7. **Integración con Facturas**
            - Campos de vehículo en facturas de cliente
            - Transferencia automática desde orden de venta
            - Búsqueda rápida por placa/marca/VIN
@@ -69,6 +87,13 @@
         - Asignación automática a proveedor genérico
         - Notificaciones en chatter
         
+        🆕 Wizard de Vinculación:
+        -------------------------
+        - Búsqueda de compras existentes por filtros
+        - Selección múltiple de compras
+        - Copia automática de datos de vehículo
+        - Actualización en tiempo real de liquidación
+        
         Navegación:
         -----------
         - Botones inteligentes en OV y OC
@@ -79,9 +104,10 @@
         Casos de Uso:
         -------------
         - Talleres mecánicos: Historial completo de servicios por vehículo
-        - Concesionarios: Seguimiento de vehículos vendidos
+        - Concesionarios: Seguimiento de vehículos vendidos con conversión USD/CRC
         - Flotillas: Control de gastos de mantenimiento por vehículo
         - Distribuidores de repuestos: Trazabilidad Venta → Compra → Factura
+        - Importadores: Gestión multimoneda con conversión automática
         
         Validado contra Odoo 18 oficial
     ''',
@@ -92,14 +118,15 @@
         'sale_management',
         'purchase',
         'stock',
-        'account',  # Agregado para integración con facturas
+        'account',
     ],
     'data': [
         'security/ir.model.access.csv',
         'wizards/create_purchase_wizard_views.xml',
+        'wizards/link_purchase_wizard_views.xml',  # 🆕 Nueva vista
         'views/sale_order_views.xml',
         'views/purchase_order_views.xml',
-        'views/account_move_views.xml',  # Agregado para vistas de facturas
+        'views/account_move_views.xml',
         'reports/sale_liquidation_report.xml',
     ],
     'demo': [],

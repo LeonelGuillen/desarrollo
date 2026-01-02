@@ -20,13 +20,14 @@ class PurchaseOrder(models.Model):
         
         return invoice_vals
 
-    # ========== CAMPOS DE VINCULACIÓN CON VENTA ==========
+    # ========== 🆕 MEJORA #2: CAMPO EDITABLE PARA VINCULACIÓN MANUAL ==========
     x_sale_order_id = fields.Many2one(
         'sale.order',
         string='Orden de Venta Asociada',
         tracking=True,
         copy=False,
-        help='Orden de venta que originó esta orden de compra'
+        # ⚠️ CAMBIO CRÍTICO: Sin readonly para permitir edición manual
+        help='Orden de venta que originó esta orden de compra. Puede editarse manualmente para vincular compras existentes.'
     )
     
     x_sale_order_name = fields.Char(
@@ -78,8 +79,35 @@ class PurchaseOrder(models.Model):
         if self.x_vin:
             self.x_vin = self.x_vin.upper()
 
+    # ========== 🆕 MEJORA #2: AUTO-ACTUALIZACIÓN AL VINCULAR VENTA ==========
+    @api.onchange('x_sale_order_id')
+    def _onchange_sale_order_id(self):
+        """
+        🎯 Al seleccionar una venta, sugerir datos del vehículo automáticamente
+        
+        UX: Si el usuario selecciona una venta manualmente, le sugiere los datos
+        del vehículo para que no los tenga que copiar a mano.
+        """
+        if self.x_sale_order_id:
+            # Solo sugerir si los campos están vacíos (no sobrescribir datos existentes)
+            if not self.x_placa and self.x_sale_order_id.x_placa:
+                self.x_placa = self.x_sale_order_id.x_placa
+            if not self.x_marca and self.x_sale_order_id.x_marca:
+                self.x_marca = self.x_sale_order_id.x_marca
+            if not self.x_anio and self.x_sale_order_id.x_anio:
+                self.x_anio = self.x_sale_order_id.x_anio
+            if not self.x_vin and self.x_sale_order_id.x_vin:
+                self.x_vin = self.x_sale_order_id.x_vin
+    
     def write(self, vals):
-        """Asegurar mayúsculas al guardar"""
+        """
+        🎯 Override write para:
+        1. Asegurar mayúsculas en campos de vehículo
+        2. Actualizar relaciones cuando se vincula/desvincula una venta
+        
+        ⚠️ SEGURO: Protección contra recursión y errores
+        """
+        # 1. Asegurar mayúsculas
         if 'x_placa' in vals and vals['x_placa']:
             vals['x_placa'] = vals['x_placa'].upper()
         if 'x_marca' in vals and vals['x_marca']:
@@ -88,7 +116,33 @@ class PurchaseOrder(models.Model):
             vals['x_anio'] = vals['x_anio'].upper()
         if 'x_vin' in vals and vals['x_vin']:
             vals['x_vin'] = vals['x_vin'].upper()
-        return super().write(vals)
+        
+        result = super().write(vals)
+        
+        # 2. Actualizar relaciones si se cambió la venta asociada
+        # ⚠️ PROTECCIÓN: Solo si realmente cambió y no es parte de un cálculo en curso
+        if 'x_sale_order_id' in vals and not self.env.context.get('skip_sale_update'):
+            for po in self:
+                if po.x_sale_order_id:
+                    try:
+                        # Usar with_context para evitar loops infinitos
+                        sale = po.x_sale_order_id.with_context(skip_sale_update=True)
+                        
+                        # Invalidar cache para forzar recálculo
+                        sale.invalidate_recordset(['purchase_order_count', 'total_purchase_amount'])
+                        
+                        # Mensaje en chatter para auditoría (solo si no es creación)
+                        if not self.env.context.get('tracking_disable'):
+                            sale.message_post(
+                                body=f'<p>✅ Orden de Compra <strong>{po.name}</strong> vinculada manualmente.</p>'
+                            )
+                    except Exception as e:
+                        # Log del error pero no bloquear la operación
+                        import logging
+                        _logger = logging.getLogger(__name__)
+                        _logger.warning(f'Error actualizando venta desde compra {po.name}: {str(e)}')
+        
+        return result
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -102,7 +156,16 @@ class PurchaseOrder(models.Model):
                 vals['x_anio'] = vals['x_anio'].upper()
             if 'x_vin' in vals and vals['x_vin']:
                 vals['x_vin'] = vals['x_vin'].upper()
-        return super().create(vals_list)
+        
+        orders = super().create(vals_list)
+        
+        # Actualizar relaciones en ventas asociadas al crear
+        for po in orders:
+            if po.x_sale_order_id:
+                po.x_sale_order_id._compute_purchase_order_count()
+                po.x_sale_order_id._compute_liquidation_data()
+        
+        return orders
 
     # ========== ACCIÓN: Ver orden de venta ==========
     def action_view_sale_order(self):

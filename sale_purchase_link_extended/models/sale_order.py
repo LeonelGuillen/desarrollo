@@ -58,6 +58,8 @@ class SaleOrder(models.Model):
         string='# de Órdenes de Compra',
         compute='_compute_purchase_order_count',
         store=False
+        # ⚠️ SIN 'groups': Accesible para todos para evitar warning de Studio
+        # El control de acceso se hace via invisible en botones
     )
     
     # ========== MEJORA #5: CONTROL DE PRODUCTOS PEDIDOS/NO PEDIDOS ==========
@@ -89,20 +91,20 @@ class SaleOrder(models.Model):
         help='Cantidad total de productos aún no pedidos'
     )
 
-    # ========== MEJORA #6: LIQUIDACIÓN DETALLADA ==========
+    # ========== 🆕 MEJORA #1: LIQUIDACIÓN CON CONVERSIÓN DE MONEDA ==========
     
     total_invoiced_amount = fields.Monetary(
         string='Total Facturado (Bruto)',
         compute='_compute_liquidation_data',
         store=False,
-        help='Total de las facturas (out_invoice) confirmadas relacionadas con esta OV'
+        help='Total de las facturas (out_invoice) confirmadas relacionadas con esta OV (convertido a moneda de venta)'
     )
     
     total_credit_note_amount = fields.Monetary(
         string='Total Notas de Crédito',
         compute='_compute_liquidation_data',
         store=False,
-        help='Total de las notas de crédito (out_refund) confirmadas'
+        help='Total de las notas de crédito (out_refund) confirmadas (convertido a moneda de venta)'
     )
     
     total_net_invoiced_amount = fields.Monetary(
@@ -116,7 +118,7 @@ class SaleOrder(models.Model):
         string='Total de Compras',
         compute='_compute_liquidation_data',
         store=False,
-        help='Total de las compras confirmadas'
+        help='Total de las compras confirmadas (convertido a moneda de venta)'
     )
     
     sale_completion_percentage = fields.Float(
@@ -131,7 +133,7 @@ class SaleOrder(models.Model):
         string='Margen de Utilidad (Neto)',
         compute='_compute_liquidation_data',
         store=False,
-        help='Diferencia entre ventas facturadas netas y compras realizadas'
+        help='Diferencia entre ventas facturadas netas y compras realizadas (en moneda de venta)'
     )
     
     purchase_orders_summary = fields.Html(
@@ -223,49 +225,145 @@ class SaleOrder(models.Model):
             order.products_purchased_qty = total_qty_purchased
             order.products_pending_qty = total_qty_pending
 
-    # ========== MEJORA #6: LIQUIDACIÓN DETALLADA ==========
-    @api.depends('invoice_ids', 'invoice_ids.state', 'invoice_ids.move_type', 'invoice_ids.amount_total',
+    # ========== 🆕 MEJORA #1: CONVERSIÓN AUTOMÁTICA DE MONEDA ==========
+    
+    def _convert_to_sale_currency(self, amount, from_currency, conversion_date):
+        """
+        🎯 MÉTODO HELPER: Convierte cualquier monto a la moneda de esta venta
+        
+        Args:
+            amount: Monto a convertir
+            from_currency: Moneda origen (recordset de res.currency)
+            conversion_date: Fecha para obtener el tipo de cambio
+            
+        Returns:
+            float: Monto convertido a self.currency_id
+            
+        ⚠️ SEGURO: Maneja errores de conversión, tipos de cambio faltantes, etc.
+        """
+        self.ensure_one()
+        
+        # Validación: Monto debe ser numérico
+        if not isinstance(amount, (int, float)):
+            return 0.0
+        
+        # Si no hay moneda origen, retornar monto original
+        if not from_currency:
+            return amount
+        
+        # Si las monedas son iguales, no hay conversión
+        if from_currency == self.currency_id:
+            return amount
+        
+        try:
+            # Usar el método estándar de Odoo para conversión
+            # https://github.com/odoo/odoo/blob/18.0/odoo/addons/base/models/res_currency.py
+            converted = from_currency._convert(
+                amount,
+                self.currency_id,           # Moneda destino (la de la venta)
+                self.company_id,            # Compañía (para tasa de cambio)
+                conversion_date or fields.Date.today()  # Fecha de conversión
+            )
+            return converted
+        except Exception as e:
+            # Si falla la conversión (ej: tipo de cambio no disponible)
+            # Loguear el error y retornar el monto original
+            import logging
+            _logger = logging.getLogger(__name__)
+            _logger.warning(
+                f'Error convirtiendo {amount} de {from_currency.name} a {self.currency_id.name} '
+                f'en fecha {conversion_date}: {str(e)}. Usando monto original.'
+            )
+            # Retornar monto original como fallback
+            return amount
+    
+    @api.depends('invoice_ids', 'invoice_ids.state', 'invoice_ids.move_type', 
+                 'invoice_ids.amount_total', 'invoice_ids.currency_id',
                  'purchase_order_ids', 'purchase_order_ids.state', 
-                 'purchase_order_ids.amount_total', 'amount_total')
+                 'purchase_order_ids.amount_total', 'purchase_order_ids.currency_id',
+                 'amount_total')
     def _compute_liquidation_data(self):
-        """Calcula los datos de liquidación, incluyendo notas de crédito y margen %"""
+        """
+        🎯 CÁLCULO DE LIQUIDACIÓN CON CONVERSIÓN DE MONEDA AUTOMÁTICA
+        
+        Convierte todos los montos (facturas y compras) a la moneda de la venta
+        usando el tipo de cambio de la fecha del documento.
+        """
         for order in self:
+            # ============ CÁLCULO DE FACTURAS (INGRESOS) ============
             posted_moves = order.invoice_ids.filtered(lambda inv: inv.state == 'posted')
             
-            invoiced_gross = sum(posted_moves.filtered(
-                lambda inv: inv.move_type == 'out_invoice'
-            ).mapped('amount_total'))
+            # Total facturado bruto (facturas de cliente)
+            invoiced_gross = 0.0
+            for invoice in posted_moves.filtered(lambda inv: inv.move_type == 'out_invoice'):
+                # 🔄 Conversión con tipo de cambio de la fecha de factura
+                amount_converted = order._convert_to_sale_currency(
+                    invoice.amount_total,
+                    invoice.currency_id,
+                    invoice.invoice_date or invoice.date
+                )
+                invoiced_gross += amount_converted
+            
             order.total_invoiced_amount = invoiced_gross
             
-            credit_notes_total = sum(posted_moves.filtered(
-                lambda inv: inv.move_type == 'out_refund'
-            ).mapped('amount_total'))
+            # Total notas de crédito
+            credit_notes_total = 0.0
+            for credit_note in posted_moves.filtered(lambda inv: inv.move_type == 'out_refund'):
+                # 🔄 Conversión con tipo de cambio de la fecha de nota de crédito
+                amount_converted = order._convert_to_sale_currency(
+                    credit_note.amount_total,
+                    credit_note.currency_id,
+                    credit_note.invoice_date or credit_note.date
+                )
+                credit_notes_total += amount_converted
+            
             order.total_credit_note_amount = credit_notes_total
             
+            # Ingreso neto (facturas - notas de crédito)
             net_invoiced = invoiced_gross - credit_notes_total
             order.total_net_invoiced_amount = net_invoiced
             
-            purchased = sum(order.purchase_order_ids.filtered(
-                lambda po: po.state in ['purchase', 'done']
-            ).mapped('amount_total'))
+            # ============ CÁLCULO DE COMPRAS (COSTOS) ============
+            purchased = 0.0
+            for po in order.purchase_order_ids.filtered(lambda p: p.state in ['purchase', 'done']):
+                # 🔄 Conversión con tipo de cambio de la fecha de la orden de compra
+                amount_converted = order._convert_to_sale_currency(
+                    po.amount_total,
+                    po.currency_id,
+                    po.date_order
+                )
+                purchased += amount_converted
+            
             order.total_purchase_amount = purchased
             
+            # ============ CÁLCULO DE UTILIDAD ============
             profit = net_invoiced - purchased
             order.profit_margin = profit
             
+            # Porcentaje de utilidad (solo si hay ingresos)
             if net_invoiced > 0:
                 order.sale_completion_percentage = profit / net_invoiced
             else:
                 order.sale_completion_percentage = 0.0
 
     @api.depends('purchase_order_ids', 'purchase_order_ids.state', 
-                 'purchase_order_ids.amount_total')
+                 'purchase_order_ids.amount_total', 'purchase_order_ids.currency_id')
     def _compute_purchase_orders_summary(self):
-        """Genera resumen HTML de órdenes de compra"""
+        """
+        🎯 RESUMEN HTML CON CONVERSIÓN DE MONEDA
+        
+        Genera tabla HTML mostrando:
+        - Monto en moneda original
+        - Monto convertido a moneda de venta (si es diferente)
+        """
         for order in self:
             if not order.purchase_order_ids:
                 order.purchase_orders_summary = '<p><em>No hay órdenes de compra relacionadas</em></p>'
                 continue
+            
+            # Determinar si hay múltiples monedas
+            currencies_used = order.purchase_order_ids.mapped('currency_id')
+            show_conversion = len(currencies_used) > 1 or order.currency_id not in currencies_used
             
             html = '<table class="table table-sm table-striped">'
             html += '<thead><tr>'
@@ -273,10 +371,14 @@ class SaleOrder(models.Model):
             html += '<th>Proveedor</th>'
             html += '<th>Estado</th>'
             html += '<th>Fecha</th>'
-            html += '<th class="text-end">Monto</th>'
+            html += '<th class="text-end">Monto Original</th>'
+            if show_conversion:
+                html += f'<th class="text-end">Equiv. en {order.currency_id.name}</th>'
             html += '</tr></thead><tbody>'
             
-            total = 0.0
+            total_original = {}  # {currency: amount}
+            total_converted = 0.0
+            
             for po in order.purchase_order_ids:
                 state_class = {
                     'draft': 'secondary',
@@ -286,21 +388,81 @@ class SaleOrder(models.Model):
                     'done': 'primary',
                     'cancel': 'danger'
                 }.get(po.state, 'secondary')
+                
                 state_label = dict(po._fields['state'].selection).get(po.state, po.state)
-                html += f'<tr>'
+                
+                html += '<tr>'
                 html += f'<td><strong>{po.name}</strong></td>'
                 html += f'<td>{po.partner_id.name}</td>'
                 html += f'<td><span class="badge badge-{state_class}">{state_label}</span></td>'
                 html += f'<td>{po.date_order.strftime("%d/%m/%Y") if po.date_order else "-"}</td>'
-                html += f'<td class="text-end"><strong>{order.currency_id.symbol} {po.amount_total:,.2f}</strong></td>'
-                html += f'</tr>'
+                
+                # Monto original
+                html += f'<td class="text-end">'
+                html += f'<strong>{po.currency_id.symbol} {po.amount_total:,.2f}</strong>'
+                html += f'</td>'
+                
+                # Monto convertido (si es diferente)
+                if show_conversion:
+                    converted_amount = order._convert_to_sale_currency(
+                        po.amount_total,
+                        po.currency_id,
+                        po.date_order
+                    )
+                    
+                    # Resaltar si hay conversión
+                    conversion_class = 'text-primary' if po.currency_id != order.currency_id else ''
+                    html += f'<td class="text-end {conversion_class}">'
+                    html += f'<strong>{order.currency_id.symbol} {converted_amount:,.2f}</strong>'
+                    html += f'</td>'
+                    
+                    if po.state in ['purchase', 'done']:
+                        total_converted += converted_amount
+                else:
+                    if po.state in ['purchase', 'done']:
+                        total_converted += po.amount_total
+                
+                # Acumular por moneda
                 if po.state in ['purchase', 'done']:
-                    total += po.amount_total
+                    if po.currency_id not in total_original:
+                        total_original[po.currency_id] = 0.0
+                    total_original[po.currency_id] += po.amount_total
+                
+                html += '</tr>'
             
-            html += '</tbody><tfoot><tr class="table-active">'
-            html += '<td colspan="4" class="text-end"><strong>Total Compras Confirmadas:</strong></td>'
-            html += f'<td class="text-end"><strong>{order.currency_id.symbol} {total:,.2f}</strong></td>'
-            html += '</tr></tfoot></table>'
+            # Fila de totales
+            html += '</tbody><tfoot>'
+            
+            # Si hay conversión, mostrar ambos totales
+            if show_conversion:
+                html += '<tr class="table-active">'
+                html += '<td colspan="4" class="text-end"><strong>Total por Moneda:</strong></td>'
+                html += '<td class="text-end">'
+                for curr, amt in total_original.items():
+                    html += f'<div><strong>{curr.symbol} {amt:,.2f}</strong></div>'
+                html += '</td>'
+                html += f'<td class="text-end text-primary">'
+                html += f'<strong>{order.currency_id.symbol} {total_converted:,.2f}</strong>'
+                html += f'<br/><small class="text-muted">(Total Convertido)</small>'
+                html += f'</td>'
+                html += '</tr>'
+            else:
+                # Una sola moneda, total simple
+                html += '<tr class="table-active">'
+                html += '<td colspan="4" class="text-end"><strong>Total Compras Confirmadas:</strong></td>'
+                html += f'<td class="text-end"><strong>{order.currency_id.symbol} {total_converted:,.2f}</strong></td>'
+                html += '</tr>'
+            
+            html += '</tfoot></table>'
+            
+            # Nota explicativa si hay conversión
+            if show_conversion:
+                html += '<div class="alert alert-info mt-2" role="alert">'
+                html += '<small><strong>ℹ️ Nota:</strong> Los montos se han convertido automáticamente '
+                html += f'a <strong>{order.currency_id.name}</strong> usando el tipo de cambio '
+                html += 'de la fecha de cada orden de compra.</small>'
+                html += '</div>'
+            
             order.purchase_orders_summary = html
 
     @api.depends('order_line.x_purchase_status')
@@ -384,6 +546,28 @@ class SaleOrder(models.Model):
             'name': _('Crear Órdenes de Compra'),
             'type': 'ir.actions.act_window',
             'res_model': 'create.purchase.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_sale_order_id': self.id,
+            }
+        }
+
+    # ========== 🆕 MEJORA #2: VINCULAR COMPRAS EXISTENTES ==========
+    def action_link_existing_purchase(self):
+        """
+        🎯 Abre wizard para buscar y vincular compras existentes
+        
+        Permite al usuario:
+        - Buscar compras por filtros (proveedor, fecha, referencia)
+        - Seleccionar múltiples compras para vincular
+        - Vincular automáticamente actualizando x_sale_order_id
+        """
+        self.ensure_one()
+        return {
+            'name': _('Vincular Órdenes de Compra Existentes'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'link.purchase.wizard',
             'view_mode': 'form',
             'target': 'new',
             'context': {
