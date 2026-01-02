@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <record id="view_order_form_inherit_purchase_link" model="ir.ui.view">
+        <field name="name">sale.order.form.inherit.purchase.link</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_purchase_orders" 
+                        type="object" 
+                        class="oe_stat_button" 
+                        icon="fa-shopping-cart"
+                        invisible="purchase_order_count == 0">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_value">
+                            <field name="purchase_order_count"/>
+                        </span>
+                        <span class="o_stat_text">Compras</span>
+                    </div>
+                </button>
+                
+                <button name="action_create_purchase_orders" 
+                        type="object" 
+                        class="oe_stat_button" 
+                        icon="fa-plus-square"
+                        string="Crear Compra"
+                        invisible="state not in ['sale', 'done']"/>
+            </xpath>
+            
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="x_placa" placeholder="AAA-1234"/>
+                <field name="x_marca" placeholder="TOYOTA"/>
+                <field name="x_anio" placeholder="2024"/>
+                <field name="x_vin" placeholder="1HGBH41JXMN109186"/>
+            </xpath>
+            
+            <xpath expr="//notebook" position="inside">
+                <page string="Liquidación de Caso" name="x_liquidacion_caso">
+                    
+                    <group>
+                        <group string="Estadísticas de Compra (Costos)">
+                            <field name="purchase_lines_in_process"/>
+                            <field name="pending_to_purchase"/>
+                            <field name="products_purchased_qty"/>
+                            <field name="products_pending_qty"/>
+                            <field name="total_purchase_amount" widget="monetary" class="oe_subtotal_footer"/>
+                        </group>
+                        
+                        <group string="Estadísticas de Venta (Ingresos)">
+                            <field name="total_invoiced_amount" widget="monetary" string="1. Total Facturado (Bruto)"/>
+                            
+                            <field name="total_credit_note_amount" widget="monetary" 
+                                   string="2. Total Notas de Crédito (-)" 
+                                   decoration-danger="total_credit_note_amount > 0"/>
+                                   
+                            <field name="total_net_invoiced_amount" widget="monetary" 
+                                   string="3. Total Facturado (Neto)" 
+                                   class="oe_subtotal_footer"/>
+                                   
+                            <field name="sale_completion_percentage" widget="percentage"
+                                   string="Porcentaje de Utilidad (Neto)"/>
+                            
+                            <field name="profit_margin" widget="monetary"
+                                   string="Margen de Utilidad (Neto)"
+                                   decoration-success="profit_margin > 0"
+                                   decoration-danger="profit_margin &lt; 0"
+                                   class="oe_subtotal_footer"/>
+                        </group>
+                    </group>
+                    
+                    <group string="Órdenes de Compra Relacionadas">
+                        <field name="purchase_orders_summary" nolabel="1" widget="html"/>
+                    </group>
+                    
+                    <group string="Control de Productos (Vendidos vs Comprados)">
+                        <field name="products_control_summary" nolabel="1" widget="html"/>
+                    </group>
+                    
+                    <div class="oe_button_box" name="liquidation_buttons">
+                        <button name="action_export_liquidation_excel" 
+                                type="object" 
+                                class="oe_highlight" 
+                                string="Exportar a Excel"
+                                icon="fa-file-excel-o"/>
+                        <button name="action_export_liquidation_pdf" 
+                                type="object" 
+                                class="oe_highlight" 
+                                string="Exportar a PDF"
+                                icon="fa-file-pdf-o"/>
+                    </div>
+                </page>
+            </xpath>
+            
+        </field>
+    </record>
+
+    <record id="view_order_tree_inherit_purchase_link" model="ir.ui.view">
+        <field name="name">sale.order.tree.inherit.purchase.link</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_quotation_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="x_placa" optional="show"/>
+                <field name="x_marca" optional="hide"/>
+                <field name="x_vin" optional="hide"/>
+                <field name="purchase_order_count" optional="show"/>
+                <field name="pending_to_purchase" optional="show"
+                       decoration-danger="pending_to_purchase > 0"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_sales_order_filter_inherit_purchase_link" model="ir.ui.view">
+        <field name="name">sale.order.search.inherit.purchase.link</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_sales_order_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <field name="x_placa"/>
+                <field name="x_marca"/>
+                <field name="x_vin"/>
+                <group expand="0" string="Agrupar Por">
+                    <filter string="Placa" name="group_placa" context="{'group_by': 'x_placa'}"/>
+                    <filter string="Marca" name="group_marca" context="{'group_by': 'x_marca'}"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+    
+    <record id="view_order_line_tree_inherit_purchase_control" model="ir.ui.view">
+        <field name="name">sale.order.line.tree.inherit.purchase.control</field>
+        <field name="model">sale.order.line</field>
+        <field name="inherit_id" ref="sale.view_order_line_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='product_uom_qty']" position="after">
+                <field name="x_qty_purchased" optional="show" string="Cant. Comprada"/>
+                <field name="x_qty_pending_purchase" optional="show" string="Cant. Pendiente"/>
+                <field name="x_purchase_status" optional="show" string="Estado Compra"
+                       decoration-success="x_purchase_status == 'purchased'"
+                       decoration-warning="x_purchase_status == 'partial'"
+                       decoration-danger="x_purchase_status == 'not_purchased'"
+                       widget="badge"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

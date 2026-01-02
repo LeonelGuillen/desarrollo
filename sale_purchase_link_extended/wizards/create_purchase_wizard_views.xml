@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <record id="view_create_purchase_wizard_form" model="ir.ui.view">
+        <field name="name">create.purchase.wizard.form</field>
+        <field name="model">create.purchase.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Crear Órdenes de Compra">
+                <sheet>
+                    <field name="sale_order_id" invisible="1"/>
+                    <field name="has_products_without_vendor" invisible="1"/>
+                    <field name="x_has_purchased_lines" invisible="1"/>
+                    
+                    <div class="alert alert-warning" role="alert" 
+                         invisible="not has_products_without_vendor">
+                        <p><strong>⚠️ Atención:</strong> Algunos productos no tienen proveedor configurado.</p>
+                        <p>Los siguientes productos (<strong><field name="products_without_vendor_count" class="oe_inline"/></strong>) 
+                           serán asignados al <strong>PROVEEDOR GENERICO</strong>:</p>
+                        <field name="products_without_vendor_list" nolabel="1" readonly="1"
+                               invisible="products_without_vendor_count == 0"/>
+                        <p><em>Configure proveedores en estos productos o edite la OC creada.</em></p>
+                    </div>
+                    
+                    <div class="alert alert-info" role="alert" 
+                         invisible="not x_has_purchased_lines">
+                        <p><strong>ℹ️ Aviso:</strong> Esta venta ya tiene productos en órdenes de compra asociadas.</p>
+                        <p>Revise la tabla "Control de Productos" de abajo. El asistente sugiere comprar solo las cantidades pendientes.</p>
+                    </div>
+                    
+                    <group string="Configuración">
+                        <field name="group_by_vendor"/>
+                        <field name="x_purchase_only_missing"/>
+                    </group>
+                    
+                    <separator string="Control de Productos (Vendido vs. Comprado)"/>
+                    
+                    <field name="products_control_summary" nolabel="1" readonly="1"/>
+                    
+                    </sheet>
+                
+                <footer>
+                    <button string="Crear Órdenes de Compra" 
+                            name="action_create_purchase_orders" 
+                            type="object" 
+                            class="btn-primary"/>
+                    <button string="Cancelar" special="cancel" class="btn-secondary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+</odoo>

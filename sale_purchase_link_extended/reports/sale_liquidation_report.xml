@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <record id="action_report_sale_liquidation" model="ir.actions.report">
+        <field name="name">Reporte de Liquidación</field>
+        <field name="model">sale.order</field>
+        <field name="report_type">qweb-pdf</field>
+        
+        <field name="report_name">sale_purchase_link_extended.report_sale_liquidation_template</field>
+        <field name="report_file">sale_purchase_link_extended.report_sale_liquidation_template</field>
+        
+        <field name="binding_model_id" ref="sale.model_sale_order"/>
+        
+        </record>
+
+    <template id="report_sale_liquidation_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <h3>Reporte de Liquidación de Caso</h3>
+                        
+                        <div class="row mt32 mb32">
+                            <div class="col-6">
+                                <strong>Cliente:</strong> <span t-field="doc.partner_id.name"/><br/>
+                                <strong>Orden de Venta:</strong> <span t-field="doc.name"/>
+                            </div>
+                            <div class="col-6">
+                                <strong>Placa:</strong> <span t-field="doc.x_placa"/><br/>
+                                <strong>Vehículo:</strong>
+                                <span t-field="doc.x_marca"/> / <span t-field="doc.x_anio"/>
+                            </div>
+                        </div>
+                        
+                        <h4>Control de Productos (Vendido vs. Comprado)</h4>
+                        <span t-raw="doc.products_control_summary"/>
+                        
+                        <h4 class="mt32">Órdenes de Compra Relacionadas</h4>
+                        <span t-raw="doc.purchase_orders_summary"/>
+                        
+                        <h4 class="mt32">Resumen Financiero</h4>
+                        <table class="table table-sm">
+                            <tr>
+                                <td>Total de Venta (Base)</td>
+                                <td class="text-end"><span t-field="doc.amount_total" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/></td>
+                            </tr>
+                            <tr>
+                                <td>Total Facturado (Venta Real)</td>
+                                <td class="text-end"><span t-field="doc.total_invoiced_amount" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/></td>
+                            </tr>
+                            <tr>
+                                <td>Total Compras Confirmadas (Costo)</td>
+                                <td class="text-end"><span t-field="doc.total_purchase_amount" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/></td>
+                            </tr>
+                            <tr class="table-active">
+                                <td><strong>Margen (Facturado vs. Comprado)</strong></td>
+                                <td class="text-end">
+                                    <strong><span t-field="doc.profit_margin" t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/></strong>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

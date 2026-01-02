@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_move_form_inherit_vehicle" model="ir.ui.view">
+        <field name="name">account.move.form.inherit.vehicle</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="x_placa" placeholder="Ej: ABC-123"/>
+                <field name="x_marca" placeholder="Ej: TOYOTA"/>
+                <field name="x_anio" placeholder="Ej: 2024"/>
+                <field name="x_vin" placeholder="Identificación..." groups="base.group_no_one"/>
+            </xpath>
+
+            <xpath expr="//field[@name='invoice_date']" position="after">
+                <field name="x_sale_order_id" 
+                       readonly="1" 
+                       invisible="not x_sale_order_id"
+                       string="Origen Venta"/>
+                <field name="x_purchase_order_id" 
+                       readonly="1" 
+                       invisible="not x_purchase_order_id"
+                       string="Origen Compra"/>
+            </xpath>
+
+        </field>
+    </record>
+
+    <record id="view_invoice_tree_inherit_vehicle" model="ir.ui.view">
+        <field name="name">account.move.tree.inherit.vehicle</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_invoice_tree"/>
+        <field name="arch" type="xml">
+            
+            <xpath expr="//field[@name='invoice_date']" position="before">
+                <field name="x_placa" optional="show" string="Placa" decoration-bf="1"/>
+                <field name="x_marca" optional="hide" string="Marca"/>
+                <field name="x_sale_order_id" optional="hide" widget="many2one_button" string="Ref. Venta"/>
+            </xpath>
+
+        </field>
+    </record>
+
+    <record id="view_account_move_filter_inherit_vehicle" model="ir.ui.view">
+        <field name="name">account.move.search.inherit.vehicle</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_account_invoice_filter"/>
+        <field name="arch" type="xml">
+            
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="x_placa" string="Placa"/>
+                <field name="x_marca" string="Marca"/>
+                <field name="x_vin" string="VIN"/>
+            </xpath>
+            
+            <xpath expr="//group" position="inside">
+                 <separator/>
+                 <filter string="Por Placa" name="group_placa" context="{'group_by': 'x_placa'}"/>
+                 <filter string="Por Marca" name="group_marca" context="{'group_by': 'x_marca'}"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

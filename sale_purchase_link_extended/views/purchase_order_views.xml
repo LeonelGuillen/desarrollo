@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <!-- VISTA FORM: Orden de Compra -->
+    <record id="view_purchase_order_form_inherit_sale_link" model="ir.ui.view">
+        <field name="name">purchase.order.form.inherit.sale.link</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_form"/>
+        <field name="arch" type="xml">
+            
+            <!-- Botón Inteligente: Ver Orden de Venta -->
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_sale_order" 
+                        type="object" 
+                        class="oe_stat_button" 
+                        icon="fa-usd"
+                        invisible="x_sale_order_id == False">
+                    <div class="o_field_widget o_stat_info">
+                        <span class="o_stat_text">Ver Venta</span>
+                    </div>
+                </button>
+            </xpath>
+            
+            <!-- Campo: Orden de Venta Asociada -->
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="x_sale_order_id" readonly="1"/>
+            </xpath>
+            
+            <!-- Campos de Vehículo -->
+            <xpath expr="//field[@name='date_order']" position="after">
+                <field name="x_placa" placeholder="AAA-1234"/>
+                <field name="x_marca" placeholder="TOYOTA"/>
+                <field name="x_anio" placeholder="2024"/>
+                <field name="x_vin" placeholder="1HGBH41JXMN109186"/>
+            </xpath>
+            
+        </field>
+    </record>
+
+    <!-- VISTA TREE: Líneas de Orden de Compra -->
+    <record id="view_purchase_order_line_tree_inherit_sale_link" model="ir.ui.view">
+        <field name="name">purchase.order.line.tree.inherit.sale.link</field>
+        <field name="model">purchase.order.line</field>
+        <field name="inherit_id" ref="purchase.purchase_order_line_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='product_id']" position="after">
+                <field name="x_sale_line_id" optional="hide"/>
+                <field name="x_sale_order_id" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- VISTA TREE: Lista de Órdenes de Compra -->
+    <record id="view_purchase_order_tree_inherit_sale_link" model="ir.ui.view">
+        <field name="name">purchase.order.tree.inherit.sale.link</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.purchase_order_tree"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='partner_id']" position="after">
+                <field name="x_sale_order_name" optional="show"/>
+                <field name="x_placa" optional="hide"/>
+                <field name="x_marca" optional="hide"/>
+                <field name="x_vin" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- VISTA SEARCH: Filtros y Búsqueda -->
+    <record id="view_purchase_order_filter_inherit_sale_link" model="ir.ui.view">
+        <field name="name">purchase.order.search.inherit.sale.link</field>
+        <field name="model">purchase.order</field>
+        <field name="inherit_id" ref="purchase.view_purchase_order_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <field name="x_sale_order_id"/>
+                <field name="x_placa"/>
+                <field name="x_marca"/>
+                <field name="x_vin"/>
+                <filter string="Con Venta Asociada" 
+                        name="with_sale_order" 
+                        domain="[('x_sale_order_id', '!=', False)]"/>
+                <group expand="0" string="Agrupar Por">
+                    <filter string="Orden de Venta" name="group_sale" context="{'group_by': 'x_sale_order_id'}"/>
+                    <filter string="Placa" name="group_placa" context="{'group_by': 'x_placa'}"/>
+                    <filter string="Marca" name="group_marca" context="{'group_by': 'x_marca'}"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
